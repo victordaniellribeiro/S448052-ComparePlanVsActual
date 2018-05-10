@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Random App Name76750</title>
+
+    <script type="text/javascript" src="https://rally1.rallydev.com/apps/2.1/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function () {
+                Ext.define("CustomApp",{extend:"Rally.app.App",componentCls:"app",launch:function(){var e=this.getContext().getProject().ObjectID;console.log("Project:",e),Ext.create("Rally.data.wsapi.Store",{model:"Project",autoLoad:!0,context:{projectScopeUp:!1,projectScopeDown:!0,project:null},filters:Rally.data.QueryFilter.or([{property:"parent.ObjectID",value:e},{property:"parent.parent.ObjectID",value:e}]),sorters:[{property:"Name",direction:"ASC"}],fetch:["Description","Name","ObjectID","Children","Releases","Iterations"],listeners:{load:function(e,t,a){console.log("Store:",e),console.log("Data:",t);var r=[],o=[],n=["releaseName","iterationName"],l=[];_.each(t,function(e){var t=e.get("ObjectID"),a=e.get("Name"),i={id:t,name:a,releases:[]};o[t]=i,r.push({xtype:"gridcolumn",dataIndex:a,text:a,columns:[{text:"Plan",dataIndex:"plan-"+t},{text:"Actual",dataIndex:"actual-"+t}]}),n.push(a),n.push("plan-"+t),n.push("actual-"+t);var c=e.getCollection("Releases");if(0!=c.initialCount){var s=Ext.create("Deft.Deferred");l.push(s),this._loadReleases(i,c).then({success:function(e){s.resolve(e)},failure:function(e){console.log("error:",e),s.reject("error loading project")}})}},this),Deft.Promise.all(l).then({success:function(e){var t=this._createReportRows(l),a=Ext.create("Ext.panel.Panel",{title:"Releases Plan VS Actual",layout:{type:"hbox",align:"stretch",padding:5},padding:5,itemId:"mainPanel"}),o=[{xtype:"gridcolumn",dataIndex:"releaseName",text:"Release"},{xtype:"gridcolumn",dataIndex:"iterationName",text:"Iteration"}];o.push.apply(o,r);var i=Ext.create("Ext.grid.Panel",{columns:o,flex:1,title:"Projects",store:{fields:n,data:t}});a.add(i),this.add(a)},failure:function(e){console.log("error:",e)},scope:this})},scope:this}})},_createReportRows:function(e){var t=new Ext.util.MixedCollection;Ext.Array.each(e,function(e){var a=e.value.id;e.value.name;Ext.Array.each(e.value.releases,function(e){e.id;var r=e.name;e.startDate,e.endDate;Ext.Array.each(e.iterations,function(e){var o,n=e.id,l=e.name,i=(e.startDate,e.endDate,e.plan),c=e.actual,s={iterationId:n,iterationName:l,releaseName:r};if(t.containsKey(r))if((o=t.get(r)).containsKey(l)){var d=o.get(l);d["plan-"+a]=i,d["actual-"+a]=c}else s["plan-"+a]=i,s["actual-"+a]=c,o.add(l,s);else o=new Ext.util.MixedCollection,s["plan-"+a]=i,s["actual-"+a]=c,o.add(l,s),t.add(r,o)})})},this);var a=[];return t.eachKey(function(e,t){t.eachKey(function(e,t){a.push(t)})}),a},_loadReleases:function(e,t){var a=Ext.create("Deft.Deferred"),r=e.id,o=Ext.create("Rally.data.QueryFilter",{property:"project.ObjectID",value:r,operator:"="});return t.load({fetch:["Name","ObjectID","Project","ReleaseStartDate","ReleaseDate","PlanEstimate"],callback:function(t,r,n){var l=[];Ext.Array.each(t,function(t){var a=Ext.create("Rally.data.QueryFilter",{property:"StartDate",value:t.get("ReleaseStartDate"),operator:">="}),r=Ext.create("Rally.data.QueryFilter",{property:"EndDate",value:t.get("ReleaseDate"),operator:"<="}),n=a.and(r).and(o),i={id:t.get("ObjectID"),name:t.get("Name"),startDate:t.get("ReleaseStartDate"),endDate:t.get("ReleaseDate"),iterations:[]};e.releases.push(i),l.push(this._loadIterations(i,n))},this),Deft.Promise.all(l).then({success:function(t){a.resolve(e)},failure:function(e){console.log("error:",e),a.reject("error loading release")}})},scope:this}),a.promise},_loadIterations:function(e,t){var a=Ext.create("Deft.Deferred");return Ext.create("Rally.data.wsapi.Store",{model:"Iteration",fetch:!0,autoLoad:!0,filters:t,sorters:[{property:"StartDate",direction:"ASC"}],listeners:{load:function(t,r,o){_.each(r,function(t){var a={id:t.get("ObjectID"),name:t.get("Name"),startDate:t.get("StartDate"),endDate:t.get("EndDate"),plan:t.get("PlannedVelocity"),actual:t.get("TaskActualTotal")};e.iterations.push(a)}),a.resolve(e)}}}),a.promise}});
+
+            Rally.launchApp('CustomApp', {
+                name:"Random App Name76750",
+                parentRepos:"",
+                version:"0.1.1"
+            });
+
+        });
+    </script>
+
+
+    <style type="text/css">
+        
+    </style>
+</head>
+<body>
+</body>
+</html>
