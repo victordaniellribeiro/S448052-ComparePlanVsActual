@@ -6,7 +6,7 @@ Random App Name76750
 
 ## License
 
-Random App Name76750 is released under the MIT license.  See the file [LICENSE](./LICENSE) for the full text.
+Compare Plan Vs Actual is released under the MIT license.  See the file [LICENSE](./LICENSE) for the full text.
 
 ##Documentation for SDK
 

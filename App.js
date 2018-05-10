@@ -131,6 +131,7 @@ Ext.define('CustomApp', {
 						            align: 'stretch',
 						            padding: 5
 						        },
+						        height: 800,
 								padding: 5,
 								itemId: 'mainPanel',
 							});
