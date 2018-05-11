@@ -8,8 +8,87 @@ Ext.define('CustomApp', {
 		var context = this.getContext();
 		var projectId = context.getProject()['ObjectID'];
 
+		var initDate = '';
+        var endDate = '';
+
 		console.log('Project:', projectId);
 
+		var initDatePicker = Ext.create('Ext.form.field.Date', {
+        	fieldLabel: 'From:',
+        	listeners : {
+        		select: function(picker, date) {
+        			//console.log(date);
+        			initDate = date.toISOString();
+        		}
+        	}
+        });
+
+        var endDatePicker = Ext.create('Ext.form.field.Date', {
+        	fieldLabel: 'To:',
+        	listeners : {
+        		select: function(picker, date) {
+        			//console.log(date);
+        			endDate = date.toISOString();
+        		}
+        	}
+        });
+
+        var searchButton = Ext.create('Rally.ui.Button', {
+        	text: 'Search',
+        	margin: '10 10 10 100',
+        	scope: this,
+        	handler: function() {
+        		//handles search
+        		//console.log(initDate, endDate);
+        		this._doSearch(initDate, endDate, projectId);
+        	}
+        });
+
+        var datePanel = Ext.create('Ext.panel.Panel', {
+            layout: 'hbox',
+            align: 'stretch',
+            padding: 5,
+            itemId: 'datePanel',
+            items: [
+                {
+	                xtype: 'panel',
+	                flex: 1,
+	                itemId: 'filterPanel'
+                }
+            ]
+                       
+        });
+
+        var mainPanel = Ext.create('Ext.panel.Panel', {
+			title: 'Releases Plan VS Actual',
+			layout: {
+	            type: 'hbox',
+	            align: 'stretch',
+	            padding: 5
+	        },
+	        height: 800,
+			padding: 5,
+			itemId: 'mainPanel',
+		});
+
+		this.myMask = new Ext.LoadMask({
+		    msg    : 'Please wait...',
+		    target : mainPanel
+		});
+
+        this.add(datePanel);
+        datePanel.down('#filterPanel').add(initDatePicker);
+        datePanel.down('#filterPanel').add(endDatePicker);
+        datePanel.down('#filterPanel').add(searchButton);
+
+        this.add(mainPanel);
+	},
+
+	_doSearch: function(initDate, endDate, projectId) {
+		if (initDate == '' || endDate == '') {
+    		return;
+    	}
+		this.myMask.show();
 
 		Ext.create('Rally.data.wsapi.Store', {
 			model: 'Project',
@@ -19,7 +98,6 @@ Ext.define('CustomApp', {
 				projectScopeDown: true,
 				project: null //null to search all workspace
 			},
-
 
 			filters: Rally.data.QueryFilter.or([{
 				property: 'parent.ObjectID',
@@ -31,7 +109,7 @@ Ext.define('CustomApp', {
 
 			// filters: [ {
 			// 	property: 'ObjectID',
-			// 	value: '75617672296'
+			// 	value: '217318192996'
 			// }],
 			sorters: [{
 				property: 'Name',
@@ -58,55 +136,74 @@ Ext.define('CustomApp', {
 						//we have all projects:
 						//console.log('Project name:', record.get('Name'), record.get('Children'));
 
-						var projectId = record.get('ObjectID');
-						var projectName = record.get('Name');
+						//only projects children
+						if (record.get('Children').Count == 0) {
+							var projectId = record.get('ObjectID');
+							var projectName = record.get('Name');
 
-						var project = {
-							id: projectId,
-							name: projectName,
-							releases: []
-						};
+							var project = {
+								id: projectId,
+								name: projectName,
+								releases: []
+							};
 
-						projectRows[projectId] = project;
+							projectRows[projectId] = project;
 
-						projectColumns.push({
-							xtype: 'gridcolumn',
-							dataIndex: projectName,
-							text: projectName,
-							columns: [{
-								text: 'Plan',
-								dataIndex: 'plan-'+projectId
-							}, {
-								text: 'Actual',
-								dataIndex: 'actual-'+projectId
-							}]
-						});
-
-						columnNames.push(projectName);
-						columnNames.push('plan-'+projectId);
-						columnNames.push('actual-'+projectId);
-
-						var releases = record.getCollection('Releases');
-
-						if (releases.initialCount != 0 ){
-							//console.log('project', project, 'releases', releases);
-
-							//wait for every release before working with projects
-							var deferred = Ext.create('Deft.Deferred');
-							projects.push(deferred);
-
-							//console.log('promised projects:', projects);
-
-							this._loadReleases(project, releases).then({
-								success: function(records) {
-									//console.log('Project', records);									
-									deferred.resolve(records);
-								},
-								failure: function(error) {
-									console.log('error:', error);
-									deferred.reject('error loading project');
-								}
+							projectColumns.push({
+								xtype: 'gridcolumn',
+								dataIndex: projectName,
+								text: projectName,
+								columns: [{
+									text: 'Plan',
+									dataIndex: 'plan-'+projectId
+								}, {
+									text: 'Actual',
+									dataIndex: 'actual-'+projectId
+								}]
 							});
+
+							columnNames.push(projectName);
+							columnNames.push('plan-'+projectId);
+							columnNames.push('actual-'+projectId);
+
+							var releases = record.getCollection('Releases',{
+								fetch: ['Name', 'ObjectID', 'Project', 'ReleaseStartDate', 'ReleaseDate', 'PlanEstimate'],
+								filters: Rally.data.QueryFilter.and([
+									{
+										property: 'StartDate',
+										operator: '>=',
+										value: initDate
+									}, {
+										property: 'ReleaseDate',
+										operator: '<=',
+										value: endDate
+									}
+								])
+							});
+
+							console.log('releases', releases);
+
+							if (releases.initialCount > 0) {
+								//console.log('project', project, 'releases', releases);
+
+								//wait for every release before working with projects
+								var deferred = Ext.create('Deft.Deferred');
+								projects.push(deferred);
+
+								console.log('promised project:', project);
+
+								this._loadReleases(project, releases, initDate, endDate).then({
+									success: function(records) {
+										console.log('Project', records);									
+										deferred.resolve(records);
+									},
+									failure: function(error) {
+										console.log('error:', error);
+										deferred.reject('error loading project');
+									}
+								});
+							}
+
 						}
 
 
@@ -114,27 +211,27 @@ Ext.define('CustomApp', {
 
 					Deft.Promise.all(projects).then({
 						success: function(records){
-							//console.log('all projects:', projects);
+							console.log('all projects:', projects);
 
 							var rows = this._createReportRows(projects);
 
-							//console.log('rows', rows);
+							console.log('rows', rows);
 
 							//create grid:
 							//console.log('p col:', projectColumns);
 							//console.log('P data', projectData);
 
-							var mainPanel = Ext.create('Ext.panel.Panel', {
-								title: 'Releases Plan VS Actual',
-								layout: {
-						            type: 'hbox',
-						            align: 'stretch',
-						            padding: 5
-						        },
-						        height: 800,
-								padding: 5,
-								itemId: 'mainPanel',
-							});
+							// var mainPanel = Ext.create('Ext.panel.Panel', {
+							// 	title: 'Releases Plan VS Actual',
+							// 	layout: {
+						 //            type: 'hbox',
+						 //            align: 'stretch',
+						 //            padding: 5
+						 //        },
+						 //        height: 800,
+							// 	padding: 5,
+							// 	itemId: 'mainPanel',
+							// });
 
 							var columns = [{
 								xtype: 'gridcolumn',
@@ -159,9 +256,12 @@ Ext.define('CustomApp', {
 									data: rows
 								}
 							});
+							this.down('#mainPanel').removeAll(true);
+							this.down('#mainPanel').add(grid);
+							// mainPanel.add(grid);
+							// this.add(mainPanel);
 
-							mainPanel.add(grid);
-							this.add(mainPanel);
+							this.myMask.hide();
 						},
 						failure: function(error) {
 							console.log('error:', error);							
@@ -248,7 +348,7 @@ Ext.define('CustomApp', {
 		return iterations;
 	},
 
-	_loadReleases: function(project, releases) {
+	_loadReleases: function(project, releases, initDate, endDate) {
 		var deferred = Ext.create('Deft.Deferred');
 
 		var projectId = project.id;
@@ -260,13 +360,12 @@ Ext.define('CustomApp', {
 						});
 
 		releases.load({
-			fetch: ['Name', 'ObjectID', 'Project', 'ReleaseStartDate', 'ReleaseDate', 'PlanEstimate'],
 			callback: function(records, operation, success) {
-				//console.log('releases of project:', record.get('ObjectID'));
 				var promises = [];
+				console.log('loading releases', records);
 
 				Ext.Array.each(records, function(release) {
-					//console.log('release: ', release);
+					console.log('release: ', release);
 					//gather all iterations using start/end date and project ID
 					var startDateFilter = Ext.create('Rally.data.QueryFilter', {
 						property: 'StartDate',
@@ -299,21 +398,25 @@ Ext.define('CustomApp', {
 				}, this);
 
 
-				Deft.Promise.all(promises).then({
-					success: function(results) {
-						//console.log('results:', results);
-						//Ext.Array.each(results, function(result) {
-							//console.log('project.releases', project.releases);
+				if (records.length == 0) {
+					deferred.resolve(project);
+				} else {
+					Deft.Promise.all(promises).then({
+						success: function(results) {
+							console.log('results:', results);
+							//Ext.Array.each(results, function(result) {
+								//console.log('project.releases', project.releases);
 
-						//});
-						//console.log('trecho final.')						
-						deferred.resolve(project);
-					},
-					failure: function(error) {
-						console.log('error:', error);
-						deferred.reject('error loading release');
-					}
-				});
+							//});
+							//console.log('trecho final.')						
+							deferred.resolve(project);
+						},
+						failure: function(error) {
+							console.log('error:', error);
+							deferred.reject('error loading release');
+						}
+					});
+				}
 
 				//console.log('Final project Object:', project);
 				
@@ -327,6 +430,7 @@ Ext.define('CustomApp', {
 
 	_loadIterations: function(release, filter) {
 		//console.log('Release', release);
+		console.log('loading iterations')
 
 		var deferred = Ext.create('Deft.Deferred');
 
@@ -351,9 +455,10 @@ Ext.define('CustomApp', {
 							startDate: record.get('StartDate'),
 							endDate: record.get('EndDate'),
 							plan: record.get('PlannedVelocity'),
-							actual: record.get('TaskActualTotal')
+							actual: record.get('PlanEstimate')
 						};
 
+						//console.log('itearation', iteration);
 						release.iterations.push(iteration);
 					});
 
