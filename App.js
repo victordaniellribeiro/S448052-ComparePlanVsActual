@@ -62,11 +62,11 @@ Ext.define('CustomApp', {
         var mainPanel = Ext.create('Ext.panel.Panel', {
 			title: 'Releases Plan VS Actual',
 			layout: {
-	            type: 'hbox',
+	            type: 'vbox',
 	            align: 'stretch',
 	            padding: 5
 	        },
-	        height: 800,
+	        //height: 800,
 			padding: 5,
 			itemId: 'mainPanel',
 		});
@@ -120,12 +120,12 @@ Ext.define('CustomApp', {
 
 			listeners: {
 				load: function(store, data, success) {
-					console.log('Store:', store);
-					console.log('Data:', data);
+					//console.log('Store:', store);
+					//console.log('Data:', data);
 
 					var projectColumns = [];
 
-					var projectRows = [];
+					//var projectRows = [];
 
 					var columnNames = ['releaseName', 'iterationName'];
 
@@ -147,7 +147,7 @@ Ext.define('CustomApp', {
 								releases: []
 							};
 
-							projectRows[projectId] = project;
+							//projectRows[projectId] = project;
 
 							projectColumns.push({
 								xtype: 'gridcolumn',
@@ -181,7 +181,7 @@ Ext.define('CustomApp', {
 								])
 							});
 
-							console.log('releases', releases);
+							//console.log('releases', releases);
 
 							if (releases.initialCount > 0) {
 								//console.log('project', project, 'releases', releases);
@@ -190,11 +190,11 @@ Ext.define('CustomApp', {
 								var deferred = Ext.create('Deft.Deferred');
 								projects.push(deferred);
 
-								console.log('promised project:', project);
+								//console.log('promised project:', project);
 
 								this._loadReleases(project, releases, initDate, endDate).then({
 									success: function(records) {
-										console.log('Project', records);									
+										//console.log('Project', records);									
 										deferred.resolve(records);
 									},
 									failure: function(error) {
@@ -209,57 +209,47 @@ Ext.define('CustomApp', {
 
 					}, this);
 
-					Deft.Promise.all(projects).then({
-						success: function(records){
-							console.log('all projects:', projects);
+					Deft.Promise.all(projects).then( {
+						success: function(records) {
+							//console.log('all projects:', projects);
 
 							var rows = this._createReportRows(projects);
 
-							console.log('rows', rows);
+							//console.log('rows', rows);
 
-							//create grid:
-							//console.log('p col:', projectColumns);
-							//console.log('P data', projectData);
-
-							// var mainPanel = Ext.create('Ext.panel.Panel', {
-							// 	title: 'Releases Plan VS Actual',
-							// 	layout: {
-						 //            type: 'hbox',
-						 //            align: 'stretch',
-						 //            padding: 5
-						 //        },
-						 //        height: 800,
-							// 	padding: 5,
-							// 	itemId: 'mainPanel',
-							// });
-
-							var columns = [{
-								xtype: 'gridcolumn',
-								dataIndex: 'releaseName',
-								text: 'Release'
-							},
-							{
-								xtype: 'gridcolumn',
-								dataIndex: 'iterationName',
-								text: 'Iteration'
-							}];
-
-							columns.push.apply(columns,projectColumns);
-
-
-							var grid = Ext.create('Ext.grid.Panel', {
-								columns: columns,
-								flex: 1,
-								title: 'Projects',
-								store: {
-									fields: columnNames,
-									data: rows
-								}
-							});
 							this.down('#mainPanel').removeAll(true);
-							this.down('#mainPanel').add(grid);
-							// mainPanel.add(grid);
-							// this.add(mainPanel);
+
+							//for each release create a panel, then create a grid with all iterations
+							rows.eachKey(function(releaseName, iterationsMap) {
+								var columns = [{
+									xtype: 'gridcolumn',
+									dataIndex: 'iterationName',
+									text: 'Iteration',
+									width: 150
+								}];
+
+								columns.push.apply(columns,projectColumns);
+
+								var iterations = [];
+
+								iterationsMap.eachKey(function(iterationName, rows) {
+									iterations.push(rows);
+								});	
+
+								var grid = Ext.create('Ext.grid.Panel', {
+									columns: columns,
+									flex: 1,
+									title: 'Release: '+releaseName,
+									store: {
+										fields: columnNames,
+										data: iterations
+									}
+								});
+
+								this.down('#mainPanel').add(grid);							
+							}, 
+							this);
+							
 
 							this.myMask.hide();
 						},
@@ -337,15 +327,8 @@ Ext.define('CustomApp', {
 
 		}, this);
 
-		var iterations = [];
-
-		rows.eachKey(function(releaseName, iterationsMap) {
-			iterationsMap.eachKey(function(iterationName, rows) {
-				iterations.push(rows);
-			});			
-		});
-
-		return iterations;
+		//map  containing releases -> iterations
+		return rows;
 	},
 
 	_loadReleases: function(project, releases, initDate, endDate) {
@@ -362,10 +345,10 @@ Ext.define('CustomApp', {
 		releases.load({
 			callback: function(records, operation, success) {
 				var promises = [];
-				console.log('loading releases', records);
+				//console.log('loading releases', records);
 
 				Ext.Array.each(records, function(release) {
-					console.log('release: ', release);
+					//console.log('release: ', release);
 					//gather all iterations using start/end date and project ID
 					var startDateFilter = Ext.create('Rally.data.QueryFilter', {
 						property: 'StartDate',
@@ -403,7 +386,7 @@ Ext.define('CustomApp', {
 				} else {
 					Deft.Promise.all(promises).then({
 						success: function(results) {
-							console.log('results:', results);
+							//console.log('results:', results);
 							//Ext.Array.each(results, function(result) {
 								//console.log('project.releases', project.releases);
 
@@ -430,7 +413,7 @@ Ext.define('CustomApp', {
 
 	_loadIterations: function(release, filter) {
 		//console.log('Release', release);
-		console.log('loading iterations')
+		//console.log('loading iterations');
 
 		var deferred = Ext.create('Deft.Deferred');
 
