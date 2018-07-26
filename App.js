@@ -117,6 +117,7 @@ Ext.define('CustomApp', {
 			}],
 
 			fetch: ['Description', 'Name', 'ObjectID', 'Children', 'Releases', 'Iterations'],
+			limit: Infinity,
 
 			listeners: {
 				load: function(store, data, success) {
@@ -159,18 +160,30 @@ Ext.define('CustomApp', {
 								}, {
 									text: 'Actual',
 									dataIndex: 'actual-'+projectId
+								}, {
+									text: 'Throughput',
+									dataIndex: 'throughtput-'+projectId,
+									renderer : function(value, meta) {
+									    if(parseInt(value) >= 100) {
+									        meta.style = "background-color:#cdf9c2; color: #090";
+									    } else {
+									        meta.style = "background-color:#ffe2e2; color: #900";
+									    }
+									    return value;
+									}
 								}]
 							});
 
 							columnNames.push(projectName);
 							columnNames.push('plan-'+projectId);
 							columnNames.push('actual-'+projectId);
+							columnNames.push('throughtput-'+projectId);
 
 							var releases = record.getCollection('Releases',{
 								fetch: ['Name', 'ObjectID', 'Project', 'ReleaseStartDate', 'ReleaseDate', 'PlanEstimate'],
 								filters: Rally.data.QueryFilter.and([
 									{
-										property: 'StartDate',
+										property: 'ReleaseStartDate',
 										operator: '>=',
 										value: initDate
 									}, {
@@ -228,7 +241,7 @@ Ext.define('CustomApp', {
 									width: 150
 								}];
 
-								columns.push.apply(columns,projectColumns);
+								columns.push.apply(columns, projectColumns);
 
 								var iterations = [];
 
@@ -287,6 +300,7 @@ Ext.define('CustomApp', {
 					var iterationEndDate = iteration.endDate;
 					var plan = iteration.plan;
 					var actual = iteration.actual;
+					var throughtput = Math.round(plan / actual * 100);
 
 					var row = {
 						iterationId: iterationId,
@@ -300,6 +314,7 @@ Ext.define('CustomApp', {
 						iterations = new Ext.util.MixedCollection();
 						row['plan-'+projectId] = plan;
 						row['actual-'+projectId] = actual;
+						row['throughtput-'+projectId] = throughtput;
 
 						//console.log('adding a new row:', row);
 						iterations.add(iterationName, row);
@@ -311,6 +326,7 @@ Ext.define('CustomApp', {
 						if (!iterations.containsKey(iterationName)) {							
 							row['plan-'+projectId] = plan;
 							row['actual-'+projectId] = actual;
+							row['throughtput-'+projectId] = throughtput;
 
 							iterations.add(iterationName, row);
 						} else {
@@ -319,6 +335,7 @@ Ext.define('CustomApp', {
 							//console.log('updating row:', row);
 							rowlocal['plan-'+projectId] = plan;
 							rowlocal['actual-'+projectId] = actual;
+							rowlocal['throughtput-'+projectId] = throughtput;
 						}
 					}
 
@@ -420,8 +437,14 @@ Ext.define('CustomApp', {
 		Ext.create('Rally.data.wsapi.Store', {
 			model: 'Iteration',
 			fetch: true,
+			context: {
+				projectScopeUp: false,
+				projectScopeDown: true,
+				project: null //null to search all workspace
+			},
 			autoLoad: true,
 			filters: filter,
+			limit: Infinity,
 			sorters: [{
 				property: 'StartDate',
 				direction: 'ASC'
