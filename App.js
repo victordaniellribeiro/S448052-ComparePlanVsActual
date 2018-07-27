@@ -13,36 +13,69 @@ Ext.define('CustomApp', {
 
 		console.log('Project:', projectId);
 
-		var initDatePicker = Ext.create('Ext.form.field.Date', {
-        	fieldLabel: 'From:',
+		// var initDatePicker = Ext.create('Ext.form.field.Date', {
+  //       	fieldLabel: 'From:',
+  //       	listeners : {
+  //       		select: function(picker, date) {
+  //       			//console.log(date);
+  //       			initDate = date.toISOString();
+  //       		}
+  //       	}
+  //       });
+
+        // var endDatePicker = Ext.create('Ext.form.field.Date', {
+        // 	fieldLabel: 'To:',
+        // 	listeners : {
+        // 		select: function(picker, date) {
+        // 			//console.log(date);
+        // 			endDate = date.toISOString();
+        // 		}
+        // 	}
+        // });
+
+        var releaseComboBox = Ext.create('Rally.ui.combobox.ReleaseComboBox',{
+        	itemId : 'releaseComboBox',
+			multiSelect: true,
+			// defaultSelectionPosition: 'clear',
         	listeners : {
-        		select: function(picker, date) {
-        			//console.log(date);
-        			initDate = date.toISOString();
-        		}
-        	}
+        		select: function(combobox, records) {
+        			console.log('combo:', combobox);
+        			console.log('records ', records);
+        			var releaseNames = [];
+        			if (records) {
+        				for (var i = records.length - 1; i >= 0; i--) {
+        					releaseNames.push(records[i].get('Name'));
+        				}
+        				this._doSearch(null, null, projectId, releaseNames);
+
+        			}   			
+        		},
+        		ready: function(combobox) {
+        			console.log('combo:', combobox);
+        			console.log('this:', this);
+
+        			// var startDate = combobox.valueModels[0].get('ReleaseStartDate');
+        			// var endDate = combobox.valueModels[0].get('ReleaseDate');
+        			var releaseNames = [];
+        			releaseNames.push(combobox.valueModels[0].get('Name'));
+
+        			this._doSearch(null, null, projectId, releaseNames);
+        		},
+        		scope: this
+	        }
+
         });
 
-        var endDatePicker = Ext.create('Ext.form.field.Date', {
-        	fieldLabel: 'To:',
-        	listeners : {
-        		select: function(picker, date) {
-        			//console.log(date);
-        			endDate = date.toISOString();
-        		}
-        	}
-        });
-
-        var searchButton = Ext.create('Rally.ui.Button', {
-        	text: 'Search',
-        	margin: '10 10 10 100',
-        	scope: this,
-        	handler: function() {
-        		//handles search
-        		//console.log(initDate, endDate);
-        		this._doSearch(initDate, endDate, projectId);
-        	}
-        });
+        // var searchButton = Ext.create('Rally.ui.Button', {
+        // 	text: 'Search',
+        // 	margin: '10 10 10 100',
+        // 	scope: this,
+        // 	handler: function() {
+        // 		//handles search
+        // 		//console.log(initDate, endDate);
+        // 		this._doSearch(initDate, endDate, projectId);
+        // 	}
+        // });
 
         var datePanel = Ext.create('Ext.panel.Panel', {
             layout: 'hbox',
@@ -77,17 +110,19 @@ Ext.define('CustomApp', {
 		});
 
         this.add(datePanel);
-        datePanel.down('#filterPanel').add(initDatePicker);
-        datePanel.down('#filterPanel').add(endDatePicker);
-        datePanel.down('#filterPanel').add(searchButton);
+        datePanel.down('#filterPanel').add(releaseComboBox);
+        //datePanel.down('#filterPanel').add(initDatePicker);
+        //datePanel.down('#filterPanel').add(endDatePicker);
+        // datePanel.down('#filterPanel').add(searchButton);
 
         this.add(mainPanel);
 	},
 
-	_doSearch: function(initDate, endDate, projectId) {
-		if (initDate == '' || endDate == '') {
-    		return;
-    	}
+	_doSearch: function(initDate, endDate, projectId, releaseNames) {
+		console.log(releaseNames);
+		// if (initDate == '' || endDate == '') {
+  //   		return;
+  //   	}
 		this.myMask.show();
 
 		Ext.create('Rally.data.wsapi.Store', {
@@ -164,7 +199,7 @@ Ext.define('CustomApp', {
 									text: 'Throughput',
 									dataIndex: 'throughtput-'+projectId,
 									renderer : function(value, meta) {
-									    if(parseInt(value) >= 100) {
+									    if (parseInt(value) >= 100) {
 									        meta.style = "background-color:#cdf9c2; color: #090";
 									    } else {
 									        meta.style = "background-color:#ffe2e2; color: #900";
@@ -179,44 +214,40 @@ Ext.define('CustomApp', {
 							columnNames.push('actual-'+projectId);
 							columnNames.push('throughtput-'+projectId);
 
-							var releases = record.getCollection('Releases',{
+							var releaseFilter = this._createReleasesFilter(releaseNames);							
+
+							var releaseStore = Ext.create('Rally.data.WsapiDataStore', {
+								model: 'Release',
+								context: {
+							        projectScopeUp: false,
+							        projectScopeDown: true,
+							        project: '/project/'+projectId
+								},
 								fetch: ['Name', 'ObjectID', 'Project', 'ReleaseStartDate', 'ReleaseDate', 'PlanEstimate'],
-								filters: Rally.data.QueryFilter.and([
-									{
-										property: 'ReleaseStartDate',
-										operator: '>=',
-										value: initDate
-									}, {
-										property: 'ReleaseDate',
-										operator: '<=',
-										value: endDate
-									}
-								])
+								limit: Infinity,
+								filters: releaseFilter
+								//autoLoad: true,
 							});
 
-							//console.log('releases', releases);
+							// console.log('releases', releases);
+							//console.log('project', project, 'releases', releases);
 
-							if (releases.initialCount > 0) {
-								//console.log('project', project, 'releases', releases);
+							//wait for every release before working with projects
+							var deferred = Ext.create('Deft.Deferred');
+							projects.push(deferred);
 
-								//wait for every release before working with projects
-								var deferred = Ext.create('Deft.Deferred');
-								projects.push(deferred);
+							//console.log('promised project:', project);
 
-								//console.log('promised project:', project);
-
-								this._loadReleases(project, releases, initDate, endDate).then({
-									success: function(records) {
-										//console.log('Project', records);									
-										deferred.resolve(records);
-									},
-									failure: function(error) {
-										console.log('error:', error);
-										deferred.reject('error loading project');
-									}
-								});
-							}
-
+							this._loadReleases(project, releaseStore, initDate, endDate).then({
+								success: function(records) {
+									//console.log('Project', records);									
+									deferred.resolve(records);
+								},
+								failure: function(error) {
+									console.log('error:', error);
+									deferred.reject('error loading project');
+								}
+							});
 						}
 
 
@@ -277,6 +308,59 @@ Ext.define('CustomApp', {
 		});
 	},
 
+
+	_createReleasesFilter: function(releases) {
+		var filter = undefined;
+
+		if (releases.length == 1) {
+			filter = {
+		        property: 'Name',
+		        operator: '=',
+		        value: releases[0]
+		    };
+		} else if (releases.length == 2) {
+			filter = Rally.data.wsapi.Filter.or([
+			    {
+			        property: 'Name',
+			        operator: '=',
+			        value: releases[0]
+			    },
+			    {
+			        property: 'Name',
+			        operator: '=',
+			        value: releases[1]
+			}]);
+		} else if (releases.length > 2) {
+			filter = Rally.data.wsapi.Filter.or([
+			    {
+			        property: 'Name',
+			        operator: '=',
+			        value: releases[0]
+			    },
+			    {
+			        property: 'Name',
+			        operator: '=',
+			        value: releases[1]
+			}]);
+
+			releases = _.last(releases, releases.length - 2);
+			//console.log('after last:', milestonesTag);
+
+			for (var name of releases) {
+				filter = Rally.data.wsapi.Filter.or([
+				    filter,
+				    {
+				        property: 'Name',
+				        operator: '=',
+				        value: name
+					}]);
+			}
+		}
+
+		return filter
+	},
+
+
 	_createReportRows: function(projects){
 		//row needs
 		var rows = new Ext.util.MixedCollection();
@@ -300,7 +384,7 @@ Ext.define('CustomApp', {
 					var iterationEndDate = iteration.endDate;
 					var plan = iteration.plan;
 					var actual = iteration.actual;
-					var throughtput = Math.round(plan / actual * 100);
+					var throughtput = Math.round(actual / plan * 100);
 
 					var row = {
 						iterationId: iterationId,
@@ -348,6 +432,7 @@ Ext.define('CustomApp', {
 		return rows;
 	},
 
+
 	_loadReleases: function(project, releases, initDate, endDate) {
 		var deferred = Ext.create('Deft.Deferred');
 
@@ -359,8 +444,8 @@ Ext.define('CustomApp', {
 							operator: '='
 						});
 
-		releases.load({
-			callback: function(records, operation, success) {
+		releases.load().then({
+			success: function(records, operation, success) {
 				var promises = [];
 				//console.log('loading releases', records);
 
