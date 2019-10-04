@@ -157,151 +157,181 @@ Ext.define('CustomApp', {
 			listeners: {
 				load: function(store, data, success) {
 					//console.log('Store:', store);
-					//console.log('Data:', data);
+					console.log('Data:', data);
 
-					var projectColumns = [];
+					if (!data || data.length == 0) {
+						//should only work with parent projects
+						var messagePanel = Ext.create('Ext.panel.Panel', {
+							flex: 1,
+							title: 'No child team found. This report should run on top level teams' ,
+						});
 
-					//var projectRows = [];
+						this.down('#mainPanel').removeAll();
 
-					var columnNames = ['releaseName', 'iterationName'];
+						this.down('#mainPanel').add(messagePanel);
 
-					var projects = [];
+						this.myMask.hide();
 
-					_.each(data, function(record) {
-						//console.log('Releases:', record.get('Releases'));
-						//we have all projects:
-						//console.log('Project name:', record.get('Name'), record.get('Children'));
+					} else {
+						var projectColumns = [];
 
-						//only projects children
-						if (record.get('Children').Count == 0) {
-							var projectId = record.get('ObjectID');
-							var projectName = record.get('Name');
+						//var projectRows = [];
 
-							var project = {
-								id: projectId,
-								name: projectName,
-								releases: []
-							};
+						var columnNames = ['releaseName', 'iterationName'];
 
-							//projectRows[projectId] = project;
+						var projects = [];
 
-							projectColumns.push({
-								xtype: 'gridcolumn',
-								dataIndex: projectName,
-								text: projectName,
-								columns: [{
-									text: 'Plan',
-									dataIndex: 'plan-'+projectId
-								}, {
-									text: 'Actual',
-									dataIndex: 'actual-'+projectId
-								}, {
-									text: 'Throughput',
-									dataIndex: 'throughtput-'+projectId,
-									renderer : function(value, meta) {
-									    if (parseInt(value) >= 100) {
-									        meta.style = "background-color:#cdf9c2; color: #090";
-									    } else {
-									        meta.style = "background-color:#ffe2e2; color: #900";
-									    }
-									    return value;
-									}
-								}]
-							});
+						_.each(data, function(record) {
+							//console.log('Releases:', record.get('Releases'));
+							//we have all projects:
+							//console.log('Project name:', record.get('Name'), record.get('Children'));
 
-							columnNames.push(projectName);
-							columnNames.push('plan-'+projectId);
-							columnNames.push('actual-'+projectId);
-							columnNames.push('throughtput-'+projectId);
+							//only projects children
+							if (record.get('Children').Count == 0) {
+								var projectId = record.get('ObjectID');
+								var projectName = record.get('Name');
+								//need to cleanup project names
+								projectName = projectName.replace(/\(/g, '' );
+								projectName = projectName.replace(/\)/g, '' );
+								projectName = projectName.replace(/\[/g, '' );
+								projectName = projectName.replace(/\]/g, '' );
+								projectName = projectName.replace(/\./g, '' );
 
-							var releaseFilter = this._createReleasesFilter(releaseNames);							
+								var project = {
+									id: projectId,
+									name: projectName,
+									releases: []
+								};
 
-							var releaseStore = Ext.create('Rally.data.WsapiDataStore', {
-								model: 'Release',
-								context: {
-							        projectScopeUp: false,
-							        projectScopeDown: true,
-							        project: '/project/'+projectId
-								},
-								fetch: ['Name', 'ObjectID', 'Project', 'ReleaseStartDate', 'ReleaseDate', 'PlanEstimate'],
-								limit: Infinity,
-								filters: releaseFilter
-								//autoLoad: true,
-							});
+								//projectRows[projectId] = project;
 
-							// console.log('releases', releases);
-							//console.log('project', project, 'releases', releases);
-
-							//wait for every release before working with projects
-							var deferred = Ext.create('Deft.Deferred');
-							projects.push(deferred);
-
-							//console.log('promised project:', project);
-
-							this._loadReleases(project, releaseStore, initDate, endDate).then({
-								success: function(records) {
-									//console.log('Project', records);									
-									deferred.resolve(records);
-								},
-								failure: function(error) {
-									console.log('error:', error);
-									deferred.reject('error loading project');
-								}
-							});
-						}
-
-
-					}, this);
-
-					Deft.Promise.all(projects).then( {
-						success: function(records) {
-							//console.log('all projects:', projects);
-
-							var rows = this._createReportRows(projects);
-
-							//console.log('rows', rows);
-
-							this.down('#mainPanel').removeAll(true);
-
-							//for each release create a panel, then create a grid with all iterations
-							rows.eachKey(function(releaseName, iterationsMap) {
-								var columns = [{
+								projectColumns.push({
 									xtype: 'gridcolumn',
-									dataIndex: 'iterationName',
-									text: 'Iteration',
-									width: 150
-								}];
-
-								columns.push.apply(columns, projectColumns);
-
-								var iterations = [];
-
-								iterationsMap.eachKey(function(iterationName, rows) {
-									iterations.push(rows);
-								});	
-
-								var grid = Ext.create('Ext.grid.Panel', {
-									columns: columns,
-									flex: 1,
-									title: 'Release: '+releaseName,
-									store: {
-										fields: columnNames,
-										data: iterations
-									}
+									dataIndex: projectName,
+									text: projectName,
+									columns: [{
+										text: 'Plan',
+										dataIndex: 'plan-'+projectId
+									}, {
+										text: 'Actual',
+										dataIndex: 'actual-'+projectId
+									}, {
+										text: 'Throughput',
+										dataIndex: 'throughtput-'+projectId,
+										renderer : function(value, meta) {
+										    if (parseInt(value) >= 100) {
+										        meta.style = "background-color:#cdf9c2; color: #090";
+										    } else {
+										        meta.style = "background-color:#ffe2e2; color: #900";
+										    }
+										    return value;
+										}
+									}]
 								});
 
-								this.down('#mainPanel').add(grid);							
-							}, 
-							this);
-							
+								columnNames.push(projectName);
+								columnNames.push('plan-'+projectId);
+								columnNames.push('actual-'+projectId);
+								columnNames.push('throughtput-'+projectId);
 
-							this.myMask.hide();
-						},
-						failure: function(error) {
-							console.log('error:', error);							
-						},
-						scope: this
-					});
+								var releaseFilter = this._createReleasesFilter(releaseNames);							
+
+								var releaseStore = Ext.create('Rally.data.WsapiDataStore', {
+									model: 'Release',
+									context: {
+								        projectScopeUp: false,
+								        projectScopeDown: true,
+								        project: '/project/'+projectId
+									},
+									fetch: ['Name', 'ObjectID', 'Project', 'ReleaseStartDate', 'ReleaseDate', 'PlanEstimate'],
+									limit: Infinity,
+									filters: releaseFilter
+									//autoLoad: true,
+								});
+
+								// console.log('releases', releases);
+								//console.log('project', project, 'releases', releases);
+
+								//wait for every release before working with projects
+								var deferred = Ext.create('Deft.Deferred');
+								projects.push(deferred);
+
+								//console.log('promised project:', project);
+
+								this._loadReleases(project, releaseStore, initDate, endDate).then({
+									success: function(records) {
+										//console.log('Project', records);									
+										deferred.resolve(records);
+									},
+									failure: function(error) {
+										//console.log('error:', error);
+										deferred.reject('error loading project');
+									}
+								});
+							}
+
+
+						}, this);
+
+						Deft.Promise.all(projects).then( {
+							success: function(records) {
+								console.log('all projects:', projects);
+
+								var rows = this._createReportRows(projects);
+
+								//console.log('rows', rows);
+
+								this.down('#mainPanel').removeAll(true);
+
+								//for each release create a panel, then create a grid with all iterations
+								rows.eachKey(function(releaseName, iterationsMap) {
+									var columns = [{
+										xtype: 'gridcolumn',
+										dataIndex: 'iterationName',
+										text: 'Iteration',
+										width: 150
+									}];
+
+
+									columns.push.apply(columns, projectColumns);
+
+									var iterations = [];
+
+									iterationsMap.eachKey(function(iterationName, rows) {
+										iterations.push(rows);
+									});	
+
+									//console.log('columns', columns);
+									//console.log('columnNames:', columnNames);
+									//console.log('data iterations:', iterations);
+
+
+									var grid = Ext.create('Ext.grid.Panel', {
+										columns: columns,
+										flex: 1,
+										title: 'Release: ' + releaseName,
+										store: {
+											fields: columnNames,
+											data: iterations
+										}
+									});
+
+
+									//console.log('grid', grid);
+
+									this.down('#mainPanel').add(grid);							
+								}, 
+								this);
+								
+
+								this.myMask.hide();
+							},
+							failure: function(error) {
+								console.log('error:', error);							
+							},
+							scope: this
+						});
+					}
 				},
 				scope: this
 			}
@@ -357,19 +387,23 @@ Ext.define('CustomApp', {
 			}
 		}
 
-		return filter
+		return filter;
 	},
 
 
-	_createReportRows: function(projects){
+	_createReportRows: function(projects) {
+		console.log('creating rows');
 		//row needs
 		var rows = new Ext.util.MixedCollection();
+
 
 		Ext.Array.each(projects, function(project) {		
 			var projectId = project.value.id;
 			var projectName = project.value.name;
 
-			//console.log('p', projectName);
+			var tempIterationCount = 0;
+
+			//console.log('row p', projectName);
 
 			Ext.Array.each(project.value.releases, function(release) {
 				var releaseId = release.id;		
@@ -422,7 +456,6 @@ Ext.define('CustomApp', {
 							rowlocal['throughtput-'+projectId] = throughtput;
 						}
 					}
-
 				});
 			});			
 
@@ -447,7 +480,7 @@ Ext.define('CustomApp', {
 		releases.load().then({
 			success: function(records, operation, success) {
 				var promises = [];
-				//console.log('loading releases', records);
+				console.log('loading releases', records);
 
 				Ext.Array.each(records, function(release) {
 					//console.log('release: ', release);
@@ -488,7 +521,7 @@ Ext.define('CustomApp', {
 				} else {
 					Deft.Promise.all(promises).then({
 						success: function(results) {
-							//console.log('results:', results);
+							console.log('releases results:', results);
 							//Ext.Array.each(results, function(result) {
 								//console.log('project.releases', project.releases);
 
@@ -515,13 +548,13 @@ Ext.define('CustomApp', {
 
 	_loadIterations: function(release, filter) {
 		//console.log('Release', release);
-		//console.log('loading iterations');
+		console.log('loading iterations for release', release);
 
 		var deferred = Ext.create('Deft.Deferred');
 
 		Ext.create('Rally.data.wsapi.Store', {
 			model: 'Iteration',
-			fetch: true,
+			fetch: ['ObjectID', 'Name', 'StartDate', 'EndDate', 'PlannedVelocity', 'PlanEstimate'],
 			context: {
 				projectScopeUp: false,
 				projectScopeDown: true,
@@ -537,7 +570,7 @@ Ext.define('CustomApp', {
 			listeners: {
 				load: function(store, data, success) {
 					//console.log('Store:', store);
-					//console.log('Data:', data);
+					//console.log('iterations loaded:', data);
 
 					_.each(data, function(record) {
 						var iteration = {
